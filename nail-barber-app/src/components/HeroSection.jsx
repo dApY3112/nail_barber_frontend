@@ -1,9 +1,6 @@
-import { useState } from 'react';
-import { Search, MapPin, Star, Award, Calendar, Scissors, User, Sparkles } from 'lucide-react';
+import { Star, Award, Scissors, User, Sparkles } from 'lucide-react';
 
 export default function HeroSection() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [location, setLocation] = useState('');
 
   const quickServices = [
     { name: 'Haircut', icon: <Scissors size={16} /> },
@@ -43,36 +40,7 @@ export default function HeroSection() {
                 Connect with trusted freelance beauty professionals. Flexible appointments, instant booking, quality guaranteed.
               </p>
             </div>
-            
-            {/* Enhanced Search Bar */}
-            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-2">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1 flex items-center bg-gray-50 rounded-xl px-4 py-4">
-                  <Search className="text-gray-400 mr-3" size={20} />
-                  <input
-                    type="text"
-                    placeholder="What service are you looking for?"
-                    className="flex-1 outline-none text-gray-800 bg-transparent placeholder-gray-500"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center bg-gray-50 rounded-xl px-4 py-4 sm:w-48">
-                  <MapPin className="text-gray-400 mr-3" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Enter location"
-                    className="outline-none text-gray-800 bg-transparent placeholder-gray-500 w-full"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                  />
-                </div>
-                <button className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-8 py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
-                  Search
-                </button>
-              </div>
-            </div>
-
+          
             {/* Quick service tags */}
             <div className="space-y-3">
               <p className="text-sm font-medium text-gray-500">Popular services:</p>

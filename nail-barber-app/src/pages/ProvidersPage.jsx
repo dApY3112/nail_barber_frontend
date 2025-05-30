@@ -1,201 +1,326 @@
-import React, { useState } from 'react';
-import { Search, MapPin, Star, Clock, Filter, Calendar, Scissors, User, Building, Award } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { listAvailability } from '../api/availability';
+import { listReviewsForProvider } from '../api/reviews';
+import {
+  Search, MapPin, Star, Clock, Filter,
+  Calendar, Award
+} from 'lucide-react';
+import { listProviders, getMyProvider } from '../api/providers';
+import RegisterProvider from '../components/RegisterProvider';
+import { useNavigate } from 'react-router-dom';
+import ReviewForm from '../components/ReviewForm';
+function ReviewsList({ providerId, onClose, onReviewSubmitted }) {
+  const [reviewsData, setReviewsData] = useState({
+    total: 0,
+    average_rating: 0,
+    items: []
+  });
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const navigate = useNavigate();
+  // 1. Tách hàm fetch để dùng chung
+  const fetchReviews = () => {
+    setLoading(true);
+    setError(null);
+    listReviewsForProvider(providerId, { page: 1, size: 5 })
+      .then(data => setReviewsData(data))
+      .catch(err => {
+        const d = err.response?.data?.detail;
+        if (Array.isArray(d)) setError(d.map(e => e.msg).join(', '));
+        else if (typeof d === 'string') setError(d);
+        else setError('Failed to load reviews');
+      })
+      .finally(() => setLoading(false));
+  };
 
-// Mock data for providers
-const mockProviders = [
-  {
-    id: 1,
-    name: "Elite Nails & Spa",
-    type: "nail",
-    rating: 4.8,
-    reviewCount: 127,
-    location: "Downtown",
-    address: "123 Main St",
-    distance: "0.5 miles",
-    image: "/api/placeholder/300/200",
-    services: ["Manicure", "Pedicure", "Gel Polish", "Nail Art"],
-    priceRange: "$$",
-    availability: "Available Today",
-    openHours: "9:00 AM - 7:00 PM",
-    popular: true,
-    description: "Premium nail salon offering luxury treatments with top-quality products"
-  },
-  {
-    id: 2,
-    name: "Classic Cuts Barbershop",
-    type: "barber",
-    rating: 4.9,
-    reviewCount: 89,
-    location: "Midtown",
-    address: "456 Oak Ave",
-    distance: "1.2 miles",
-    image: "/api/placeholder/300/200",
-    services: ["Haircut", "Beard Trim", "Hot Towel Shave", "Hair Styling"],
-    priceRange: "$",
-    availability: "Next available: Tomorrow 2:00 PM",
-    openHours: "8:00 AM - 8:00 PM",
-    popular: false,
-    description: "Traditional barbershop experience with skilled professionals"
-  },
-  {
-    id: 3,
-    name: "Luxe Beauty Lounge",
-    type: "nail",
-    rating: 4.7,
-    reviewCount: 203,
-    location: "Uptown",
-    address: "789 Pine St",
-    distance: "2.1 miles",
-    image: "/api/placeholder/300/200",
-    services: ["Acrylic Nails", "Dip Powder", "Manicure", "Pedicure"],
-    priceRange: "$$$",
-    availability: "Available Today",
-    openHours: "10:00 AM - 6:00 PM",
-    popular: true,
-    description: "High-end beauty lounge specializing in advanced nail techniques"
-  },
-  {
-    id: 4,
-    name: "The Gentleman's Den",
-    type: "barber",
-    rating: 4.6,
-    reviewCount: 156,
-    location: "Old Town",
-    address: "321 Elm St",
-    distance: "1.8 miles",
-    image: "/api/placeholder/300/200",
-    services: ["Classic Cut", "Fade", "Beard Styling", "Mustache Trim"],
-    priceRange: "$$",
-    availability: "Available Today",
-    openHours: "9:00 AM - 7:00 PM",
-    popular: false,
-    description: "Classic gentleman's barbershop with vintage atmosphere"
-  },
-  {
-    id: 5,
-    name: "Nail Artistry Studio",
-    type: "nail",
-    rating: 4.9,
-    reviewCount: 94,
-    location: "Westside",
-    address: "654 Maple Dr",
-    distance: "3.0 miles",
-    image: "/api/placeholder/300/200",
-    services: ["Custom Nail Art", "Extensions", "Gel Manicure", "Pedicure"],
-    priceRange: "$$$",
-    availability: "Next available: Today 4:00 PM",
-    openHours: "11:00 AM - 8:00 PM",
-    popular: true,
-    description: "Creative nail art studio with custom designs and premium services"
-  },
-  {
-    id: 6,
-    name: "Urban Fade Co.",
-    type: "barber",
-    rating: 4.8,
-    reviewCount: 112,
-    location: "Downtown",
-    address: "987 Cedar St",
-    distance: "0.8 miles",
-    image: "/api/placeholder/300/200",
-    services: ["Modern Cuts", "Skin Fade", "Beard Design", "Hair Wash"],
-    priceRange: "$$",
-    availability: "Available Today",
-    openHours: "10:00 AM - 9:00 PM",
-    popular: true,
-    description: "Modern barbershop specializing in contemporary cuts and fades"
-  }
-];
+  useEffect(fetchReviews, [providerId]);
 
-export function ProvidersPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState('all');
+  // 2. Khi submit review thành công
+  const handleReviewSuccess = () => {
+    fetchReviews();           // reload list với average rating mới
+    if (onReviewSubmitted) {
+      onReviewSubmitted();    // cho parent (ProvidersPage) biết để fetchProviders
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+      <div className="bg-white w-full max-w-lg p-6 rounded-lg relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-500"
+        >×</button>
+
+        <h2 className="text-xl font-semibold mb-4">Reviews</h2>
+
+        {/* 3. ReviewForm nằm trong modal */}
+        <div className="mb-6">
+          <ReviewForm
+            providerId={providerId}
+            onSuccess={handleReviewSuccess}
+          />
+        </div>
+
+        {loading && <p>Loading…</p>}
+        {error   && <p className="text-red-500">{error}</p>}
+
+        {reviewsData && (
+          <>
+          <p className="mb-2 text-sm text-gray-600">
+            {reviewsData.average_rating.toFixed(1)}{' '}
+            <Star className="inline text-yellow-400" size={14} />
+            &nbsp;·&nbsp;
+            {reviewsData.total} review{reviewsData.total > 1 && 's'}
+          </p>
+            <div className="space-y-4 overflow-y-auto max-h-96">
+              {reviewsData.items.map(r => (
+                <div key={r.id} className="border-b pb-2">
+                  <div className="flex items-center gap-1 mb-1">
+                    <Star className="text-yellow-400" size={16}/>
+                    <span className="font-medium">{r.rating}</span>
+                    <span className="text-gray-500 text-xs ml-2">
+                      {new Date(r.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {r.comment && <p className="text-gray-700 text-sm">{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+            {reviewsData.total > reviewsData.items.length && (
+              <button
+                className="mt-4 text-blue-600 hover:underline"
+                onClick={() => navigate(`/providers/${providerId}/reviews`)}
+              >
+                See all {reviewsData.total} review{reviewsData.total > 1 && 's'}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+export default function ProvidersPage() {
+  const [openReviewsFor, setOpenReviewsFor] = useState(null);
+  const navigate = useNavigate();
+  const [showRegister, setShowRegister] = useState(false);
+  // Kiểm tra user đã là provider chưa
+  const [isProvider, setIsProvider] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  // State chính cho phần providers list
+  const [providers, setProviders] = useState([]);
+  const [loadingList, setLoadingList]     = useState(false);
+  const [errorList, setErrorList]         = useState(null);
+    const [searchTerm, setSearchTerm]       = useState('');
+  const [selectedType, setSelectedType]   = useState('all');
   const [selectedPrice, setSelectedPrice] = useState('all');
-  const [sortBy, setSortBy] = useState('rating');
-
+  const [selectedCity, setSelectedCity]   = useState('');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [sortBy, setSortBy]               = useState('rating');
+// availability cache: { [providerId]: [AvailabilityResponse] }
+const [availabilityMap, setAvailabilityMap] = useState({});
+const DayNames = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const fetchProviders = useCallback(async () => {
+    setLoadingList(true);
+    setErrorList(null);
+    try {
+      const data = await listProviders({ page:1, size:50 /* + filters */ });
+      setProviders(data.items ?? data);
+    } catch (err) {
+      setErrorList(err.response?.data?.detail || 'Failed to load providers');
+    } finally {
+      setLoadingList(false);
+    }
+  }, [searchTerm, selectedType, selectedPrice, selectedCity, selectedCountry /*, sortBy nếu cần */]);
+useEffect(() => {
+  if (!loadingProfile) fetchProviders();
+}, [loadingProfile, fetchProviders]);
+  // Filters & sort
   const categories = [
-    { id: 'all', name: 'All Providers', icon: <Building size={20} /> },
-    { id: 'nail', name: 'Nail Salons', icon: <User size={20} /> },
-    { id: 'barber', name: 'Barbershops', icon: <Scissors size={20} /> }
   ];
-
-  const filteredProviders = mockProviders
-    .filter(provider => {
-      const matchesSearch = provider.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          provider.services.some(service => service.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          provider.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType = selectedType === 'all' || provider.type === selectedType;
-      const matchesPrice = selectedPrice === 'all' || provider.priceRange === selectedPrice;
-      return matchesSearch && matchesType && matchesPrice;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'rating':
-          return b.rating - a.rating;
-        case 'distance':
-          return parseFloat(a.distance) - parseFloat(b.distance);
-        case 'price':
-          return a.priceRange.length - b.priceRange.length;
-        default:
-          return 0;
+   useEffect(() => {
+     async function fetchProfile() {
+       try {
+         await getMyProvider();
+         setIsProvider(true);
+       } catch (err) {
+         if (err.response?.status === 404) {
+           setIsProvider(false);
+         } else {
+           console.error(err);
+         }
+       } finally {
+         setLoadingProfile(false);
+       }
+     }
+     fetchProfile();
+   }, []);
+  // Fetch real providers từ backend
+    // 2) nếu đã là provider, mới fetch list
+  useEffect(() => {
+    if (loadingProfile) return;    // chờ profile xong mới fetch
+    async function fetchData() {
+      setLoadingList(true);
+      setErrorList(null);
+      try {
+        const data = await listProviders({
+          search:      searchTerm,
+          type:        selectedType,
+          price_range: selectedPrice,
+          city:        selectedCity,
+          country:     selectedCountry,
+          page:        1,
+          size:        50,
+        });
+        setProviders(data.items ?? data);
+      } catch (err) {
+        setErrorList(err.response?.data?.detail || 'Failed to load providers');
+      } finally {
+        setLoadingList(false);
+      }
+    }
+    fetchData();
+  }, [loadingProfile, searchTerm, selectedType, selectedPrice, selectedCity, selectedCountry, sortBy]);
+ // Khi providers thay đổi, fetch availability cho mỗi provider
+  useEffect(() => {
+    providers.forEach(p => {
+      if (!availabilityMap[p.id]) {
+        listAvailability(p.id)
+          .then(av => setAvailabilityMap(m => ({ ...m, [p.id]: av })))
+          .catch(() => {});
       }
     });
+  }, [providers]);
+   // Hiển thị form đăng ký nếu profile chưa có
+  const actionButton = () => {
+    if (loadingProfile) return null;
+    if (isProvider) {
+      return (
+        <button
+          onClick={() => navigate('/providers/me')}
+          className="mb-6 inline-block px-6 py-3 bg-green-500 text-white rounded-lg"
+        >
+          Your Provider Dashboard
+        </button>
+      );
+    } else {
+      return (
+        <button
+          onClick={() => setShowRegister(true)}
+          className="mb-6 inline-block px-6 py-3 bg-blue-500 text-white rounded-lg"
+        >
+          Đăng ký làm Provider
+        </button>
+      );
+    }
+  };
+
+  // Phần render danh sách providers (giống code cũ, chỉ đổi tên vài biến)
+const filtered = providers
+  .filter(p => {
+    const term = searchTerm.toLowerCase();
+
+    // fallback về chuỗi rỗng hoặc mảng rỗng nếu undefined
+    const name        = p.company_name  ?? '';
+    const desc        = p.description   ?? '';
+    const servicesArr = p.services      ?? [];
+
+    return (
+      (!searchTerm) ||
+      name.toLowerCase().includes(term) ||
+      desc.toLowerCase().includes(term) ||
+      servicesArr.some(s => s.toLowerCase().includes(term))
+    )
+    && (selectedType === 'all' || p.type === selectedType)
+    && (selectedPrice === 'all' || p.priceRange === selectedPrice)
+    && (!selectedCity   || p.city === selectedCity)
+    && (!selectedCountry|| p.country === selectedCountry);
+  })
+  .sort((a, b) => {
+    if (sortBy === 'rating') return b.rating - a.rating;
+    if (sortBy === 'price')  return a.priceRange.length - b.priceRange.length;
+    return 0;
+  });
+
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
+      {/* Hero + Search */}
       <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl lg:text-5xl font-bold mb-4">
-              Find Your Perfect Provider
-            </h1>
-            <p className="text-xl text-yellow-100 mb-8 max-w-2xl mx-auto">
-              Discover top-rated nail salons and barbershops in your area
-            </p>
-            
-            {/* Search Bar */}
-            <div className="max-w-2xl mx-auto bg-white rounded-lg p-3 flex items-center shadow-lg">
-              <Search className="text-gray-400 mx-3" size={20} />
-              <input
-                type="text"
-                placeholder="Search providers or services..."
-                className="flex-1 outline-none text-gray-800 py-2"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <button className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-md font-medium transition-colors">
-                Search
-              </button>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <h1 className="text-4xl lg:text-5xl font-bold mb-4">Find Your Perfect Provider</h1>
+          <p className="text-xl text-yellow-100 mb-8 max-w-2xl mx-auto">
+            Discover top-rated nail salons and barbershops in your area
+          </p>
+          <div className="max-w-2xl mx-auto flex items-center bg-white rounded-lg p-3 shadow-lg">
+            <Search className="text-gray-400 mx-3" size={20}/>
+            <input
+              type="text"
+              placeholder="Search providers or services..."
+              className="flex-1 outline-none py-2 text-gray-800"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        {actionButton()}
+        {/* Form đăng ký popup */}
+       {showRegister && (
+         <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+           <div className="bg-white p-6 rounded-lg max-w-md w-full">
+             <button
+               className="text-gray-500 float-right"
+               onClick={() => setShowRegister(false)}
+             >×</button>
+             <RegisterProvider onSuccess={() => {
+               setShowRegister(false);
+               setIsProvider(true);
+             }}/>
+           </div>
+         </div>
+       )}
         {/* Filters */}
         <div className="mb-8">
-          <div className="flex flex-wrap gap-4 items-center justify-between mb-6">
+            {/* City & Country Filters */}
+          <div className="flex gap-4 mb-4">
+            <input
+              type="text"
+              placeholder="City"
+              className="px-4 py-2 border rounded-lg focus:ring-yellow-500 bg-white flex-1"
+              value={selectedCity}
+              onChange={e => setSelectedCity(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Country"
+              className="px-4 py-2 border rounded-lg focus:ring-yellow-500 bg-white flex-1"
+              value={selectedCountry}
+              onChange={e => setSelectedCountry(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap justify-between items-center mb-4">
             <div className="flex items-center gap-2">
-              <Filter size={20} className="text-gray-600" />
+              <Filter size={20} className="text-gray-600"/>
               <span className="font-medium text-gray-900">Filter by type:</span>
             </div>
             <div className="flex gap-4">
               <select
-                className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
+                className="px-4 py-2 border rounded-lg focus:ring-yellow-500 bg-white"
                 value={selectedPrice}
-                onChange={(e) => setSelectedPrice(e.target.value)}
+                onChange={e => setSelectedPrice(e.target.value)}
               >
                 <option value="all">All Prices</option>
                 <option value="$">$ - Budget</option>
                 <option value="$$">$$ - Moderate</option>
                 <option value="$$$">$$$ - Premium</option>
               </select>
-              
               <select
-                className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
+                className="px-4 py-2 border rounded-lg focus:ring-yellow-500 bg-white"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={e => setSortBy(e.target.value)}
               >
                 <option value="rating">Highest Rated</option>
                 <option value="distance">Nearest</option>
@@ -203,140 +328,145 @@ export function ProvidersPage() {
               </select>
             </div>
           </div>
-          
           <div className="flex flex-wrap gap-3">
-            {categories.map((category) => (
+            {categories.map(cat => (
               <button
-                key={category.id}
-                onClick={() => setSelectedType(category.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-                  selectedType === category.id
+                key={cat.id}
+                onClick={() => setSelectedType(cat.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
+                  selectedType === cat.id
                     ? 'bg-yellow-500 text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-yellow-50 border border-gray-200'
+                    : 'bg-white text-gray-700 hover:bg-yellow-50 border'
                 }`}
               >
-                {category.icon}
-                <span className="font-medium">{category.name}</span>
+                {cat.icon}
+                <span>{cat.name}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Results count */}
-        <div className="mb-6">
-          <p className="text-gray-600">
-            Showing {filteredProviders.length} provider{filteredProviders.length !== 1 ? 's' : ''}
-            {selectedType !== 'all' && ` in ${categories.find(c => c.id === selectedType)?.name}`}
-          </p>
-        </div>
+        {/* Status */}
+        {loadingList ? (
+          <div className="text-center py-16">Loading providers…</div>
+        ) : errorList ? (
+          <div className="text-red-600 text-center py-16">{errorList}</div>
+        ) : (
+          <>
+            <p className="text-gray-600 mb-6">
+              Showing {filtered.length} provider{filtered.length !== 1 && 's'}
+            </p>
 
-        {/* Providers Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredProviders.map((provider) => (
-            <div key={provider.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group">
-              {/* Provider Image */}
-              <div className="relative">
-                <img 
-                  src={provider.image} 
-                  alt={provider.name}
-                  className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                {provider.popular && (
-                  <div className="absolute top-3 left-3 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-                    <Award size={14} />
-                    Popular
-                  </div>
-                )}
-                <div className="absolute top-3 right-3 bg-white bg-opacity-90 px-2 py-1 rounded-full text-sm font-bold text-gray-900">
-                  {provider.priceRange}
-                </div>
-              </div>
+            {/* Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filtered.map(provider => {
+              // Lấy availability đã load cho provider này
+              const avail = availabilityMap[provider.id] || [];
+              const first = avail[0];
+                const idx = typeof first?.day_of_week === 'number'
+                ? first.day_of_week
+                : parseInt(first?.day_of_week, 10);
+              // Hiển thị khung giờ đầu tiên (ví dụ): thứ trong tuần + giờ
+              const hoursText = avail.length
+                ? `${DayNames[avail[0].day_of_week]} ${avail[0].start_time.slice(0,5)}–${avail[0].end_time.slice(0,5)}`
+                : 'No availability';
 
-              {/* Provider Details */}
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-yellow-600 transition-colors">
-                  {provider.name}
-                </h3>
-                <p className="text-gray-600 mb-4 line-clamp-2">
-                  {provider.description}
-                </p>
-
-                {/* Rating and Location */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-1">
-                    <Star className="text-yellow-400 fill-current" size={16} />
-                    <span className="font-medium text-gray-900">{provider.rating}</span>
-                    <span className="text-gray-500 text-sm">({provider.reviewCount})</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-gray-500">
-                    <MapPin size={16} />
-                    <span className="text-sm">{provider.distance}</span>
-                  </div>
-                </div>
-
-                {/* Hours and Availability */}
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock size={16} className="text-gray-400" />
-                    <span className="text-sm text-gray-600">{provider.openHours}</span>
-                  </div>
-                  <span className={`text-sm font-medium ${
-                    provider.availability.includes('Available Today') 
-                      ? 'text-green-600' 
-                      : 'text-orange-600'
-                  }`}>
-                    {provider.availability}
-                  </span>
-                </div>
-
-                {/* Services */}
-                <div className="mb-4">
-                  <div className="flex flex-wrap gap-1">
-                    {provider.services.slice(0, 3).map(service => (
-                      <span key={service} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                        {service}
-                      </span>
-                    ))}
-                    {provider.services.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                        +{provider.services.length - 3} more
-                      </span>
+              return (
+                <div
+                  key={provider.id}
+                  className="bg-white rounded-xl shadow-sm hover:shadow-lg transition overflow-hidden group"
+                >
+                  <div className="relative">
+                    <img
+                      src={provider.image_url || provider.image}
+                      alt={provider.company_name}
+                      className="w-full h-48 object-cover group-hover:scale-105 transition"
+                    />
+                    {provider.popular && (
+                      <div className="absolute top-3 left-3 bg-yellow-500 text-white px-3 py-1 rounded-full flex items-center gap-1">
+                        <Award size={14}/> Popular
+                      </div>
                     )}
+                    <div className="absolute top-3 right-3 bg-white bg-opacity-90 px-2 py-1 rounded-full text-gray-900">
+                      {provider.price_range || provider.priceRange}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    {/* Rating summary */}
+                    <div className="flex items-center gap-1 mb-3">
+                      <Star className="text-yellow-400" size={16}/>
+                      <span className="text-sm font-semibold">
+                        {provider.rating != null ? provider.rating.toFixed(1) : '0.0'}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({provider.review_count ?? 0})
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold mb-2 group-hover:text-yellow-600 transition">
+                      {provider.company_name}
+                    </h3>
+                    <p className="text-gray-600 mb-4 line-clamp-2">
+                      {provider.description}
+                    </p>
+                    {/* Availability */}
+                    <div className="flex items-center gap-2 mb-4 text-gray-600">
+                      <Clock size={16} className="text-gray-400"/>
+                      <span className="text-sm">{hoursText}</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-1">
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <MapPin size={16}/>
+                        <span className="text-sm">
+                          {provider.city}{provider.city && provider.country && ','}&nbsp;{provider.country}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-4">
+                      {(provider.services || []).slice(0,3).map(s => (
+                        <span key={s} className="px-2 py-1 bg-gray-100 text-xs rounded-full">
+                          {s}
+                        </span>
+                      ))}
+                      {(provider.services || []).length > 3 && (
+                        <span className="px-2 py-1 bg-gray-100 text-xs rounded-full">
+                          +{provider.services.length-3} more
+                        </span>
+                      )}
+                    </div>
+                    {/* Book Now mở modal */}
+                    <button
+                      onClick={() => navigate(`/providers/${provider.id}/services`)}
+                      className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-white py-3 rounded-lg transition"
+                    >
+                      <Calendar size={16}/> Book Now
+                    </button>
+                    <button
+                onClick={() => navigate(`/providers/${provider.id}/reviews`)}
+                className="mt-4 text-blue-600 hover:underline text-sm"
+              >
+                View Reviews
+              </button>
                   </div>
                 </div>
-
-                {/* Action Button */}
-                <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
-                  <Calendar size={16} />
-                  Book Now
-                </button>
-              </div>
+              );
+            })}
             </div>
-          ))}
-        </div>
-
-        {/* No results */}
-        {filteredProviders.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-gray-400 mb-4">
-              <Search size={64} className="mx-auto" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No providers found</h3>
-            <p className="text-gray-600">Try adjusting your search or filter criteria</p>
-          </div>
+          </>
         )}
-
-        {/* Call to Action */}
-        <div className="mt-16 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-2xl p-8 text-center text-white">
-          <h2 className="text-2xl font-bold mb-4">Want to become a provider?</h2>
-          <p className="text-yellow-100 mb-6">Join our network of professional beauty and grooming service providers</p>
-          <button className="bg-white text-yellow-600 hover:bg-gray-100 px-8 py-3 rounded-full font-semibold transition-colors">
-            Apply Now
-          </button>
-        </div>
       </div>
+      {openReviewsFor && (
+        <ReviewsList
+          providerId={openReviewsFor}
+          onClose={() => setOpenReviewsFor(null)}
+         onReviewSubmitted={() => {
+           setOpenReviewsFor(null);
+           fetchProviders();   // ← reload lại để cập nhật average rating ngay
+         }}
+        />
+
+      )}
     </div>
   );
 }
-
-export default ProvidersPage;

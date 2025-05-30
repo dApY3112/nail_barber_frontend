@@ -7,7 +7,7 @@ import * as usersApi from '../api/users';
 
 export default function EditProfilePage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
 
   // form state
   const [form, setForm] = useState({
@@ -44,6 +44,7 @@ export default function EditProfilePage() {
     setLoading(true);
     try {
       await usersApi.updateProfile(form);
+      await refreshUser();
       // sau khi cập nhật, quay về profile view
       navigate('/profile', { replace: true });
     } catch (err) {

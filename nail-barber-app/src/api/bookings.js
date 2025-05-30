@@ -19,3 +19,7 @@ export async function cancelBooking(id) {
   const res = await api.patch(`/bookings/cancel/${id}`);
   return res.data;
 }
+export async function fetchBooking(id) {
+  const res = await api.get(`/bookings/${id}`);
+  return res.data;
+}

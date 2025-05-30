@@ -1,6 +1,7 @@
 import api from '../utils/api';
 
 export async function createReview(data) {
+  // data = { provider_id, rating, comment }
   const res = await api.post('/reviews', data);
   return res.data;
 }

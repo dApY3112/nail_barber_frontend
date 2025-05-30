@@ -12,18 +12,67 @@ import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import ProtectedRoute from './components/ProtectedRoute'
 import EditProfilePage from './pages/EditProfilePage';
+import MyProviderPage from './pages/MyProviderPage';
+import ScrollToTop from './components/ScrollToTop';
+import MyServicesPage from './pages/MyServicesPage';
+import EditProviderPage from './pages/EditProviderPage';
+import ProviderServicesPage from './pages/ProviderServicesPage';
+import ReviewsPage from './pages/ReviewsPage';
+import PaymentPage from './pages/PaymentPage';
+import TransactionDetailPage from './pages/TransactionDetailPage';
+import CartPage     from './pages/CartPage';
 export default function App() {
   return (
     <AuthProvider>
       <Router>
+        <ScrollToTop />
         <div className="min-h-screen bg-gray-50 flex flex-col">
           <Header />
-
           <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/services" element={<ServicesPage />} />
+              <Route path="/my-services" element={<MyServicesPage />} />
+              <Route path="/payment/:bookingId" element={<PaymentPage />} />
+              <Route path="/transactions/:transactionId" element={<TransactionDetailPage />} />
+              <Route path="/bookings/me" element={<CartPage />} />
               <Route path="/providers" element={<ProvidersPage />} />
+              <Route
+                path="/providers/me"
+                element={
+                  <ProtectedRoute>
+                    <MyProviderPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+              path="/providers/me/edit"
+              element={
+                <ProtectedRoute>
+                  <EditProviderPage />
+                </ProtectedRoute>
+              }
+              />
+              <Route
+              path="/providers/me/services"
+              element={
+                <ProtectedRoute>
+                  <MyServicesPage />
+                </ProtectedRoute>
+              }
+            />
+              <Route
+              path="/providers/:providerId/services"
+              element={
+                <ProtectedRoute>
+                  <ProviderServicesPage />
+                </ProtectedRoute>
+              }
+            />
+                <Route
+                  path="/providers/:providerId/reviews"
+                  element={<ReviewsPage />}
+                />
               <Route path="/about" element={<AboutPage />} />
               <Route 
                 path="/profile" 
